@@ -1,3 +1,3 @@
-# itsc-4681-project2
+# CLI Coding Assistant
 
 David Ho
