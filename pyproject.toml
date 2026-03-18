@@ -59,7 +59,7 @@ docs = [
 ]
 
 [project.scripts]
-nexus = "nexus.main:main"
+nexus = "nexus.main:app"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
