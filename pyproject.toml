@@ -1,9 +1,88 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "cli-coding-assistant"
+name = "nexus-cli"
 version = "0.1.0"
-description = "Add your description here"
+description = "NEXUS - Neural Executive Xperiment for Unified Software automation. An autonomous CLI coding assistant with agentic reasoning and MCP integration."
 readme = "README.md"
 requires-python = ">=3.12"
+authors = [{name = "Team NEXUS"}]
+license = {text = "MIT"}
+
 dependencies = [
+    # MCP & Framework
     "fastmcp>=3.1.0",
+
+    # LLM Providers
+    "groq>=0.4.0",
+    "ollama>=0.1.0",
+
+    # CLI & Output
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+
+    # Data Validation & Types
+    "pydantic>=2.0.0",
+
+    # Async & Concurrency
+    "aiofiles>=23.0.0",
+    "tenacity>=8.2.0",
+
+    # HTTP Client
+    "httpx>=0.24.0",
+
+    # Logging
+    "python-json-logger>=2.0.0",
+
+    # Vector DB & Embeddings (Phase 4)
+    # "chroma-db>=0.3.0",
+    # "sentence-transformers>=2.2.0",
+    # "langchain>=0.0.300",
+    # "sqlalchemy>=2.0.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.4.0",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+]
+
+[project.scripts]
+nexus = "nexus.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--cov=src/nexus --cov-report=html --cov-report=term-missing"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
