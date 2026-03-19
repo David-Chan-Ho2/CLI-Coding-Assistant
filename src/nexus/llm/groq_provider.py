@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from typing import Optional
+from typing import Any, Optional
 
 from groq import Groq
 
@@ -67,7 +67,8 @@ class GroqProvider(LLMProvider):
             if conversation_history:
                 messages.extend(conversation_history)
 
-            messages.append({"role": "user", "content": prompt})
+            if prompt:
+                messages.append({"role": "user", "content": prompt})
 
             # Build kwargs
             kwargs = {

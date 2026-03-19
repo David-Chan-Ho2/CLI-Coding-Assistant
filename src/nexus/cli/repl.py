@@ -22,18 +22,28 @@ class REPLInterface:
         """Initialize the REPL interface."""
         self.session: Optional[SessionContext] = None
         self.running = False
+        self.agent = None
 
-    def start_session(self, session_id: Optional[str] = None, execution_mode: ExecutionMode = ExecutionMode.AUTO) -> SessionContext:
-        """Start a new session.
+    def set_agent(self, agent) -> None:
+        """Attach an agent to the REPL."""
+        self.agent = agent
+
+    def start_session(self, session_id: Optional[str] = None, execution_mode: ExecutionMode = ExecutionMode.AUTO, existing_session: Optional[SessionContext] = None) -> SessionContext:
+        """Start or resume a session.
 
         Args:
-            session_id: Optional session ID.
+            session_id: Optional session ID for a new session.
             execution_mode: Initial execution mode.
+            existing_session: A previously saved session to resume.
 
         Returns:
-            The created session.
+            The active session.
         """
-        self.session = SessionContext(session_id=session_id, execution_mode=execution_mode)
+        if existing_session:
+            self.session = existing_session
+            self.session.set_execution_mode(execution_mode)
+        else:
+            self.session = SessionContext(session_id=session_id, execution_mode=execution_mode)
         self._print_welcome()
         return self.session
 
@@ -61,6 +71,11 @@ Enter your coding task or instruction below:
             console.print("[red]Error: No session started[/red]")
             return
 
+        # Initialize MCP tools if the agent has an executor
+        if self.agent and hasattr(self.agent.tool_executor, "initialize"):
+            console.print("[dim]Initializing tools...[/dim]")
+            await self.agent.tool_executor.initialize()
+
         self.running = True
         try:
             while self.running:
@@ -78,11 +93,16 @@ Enter your coding task or instruction below:
                         await self._handle_command(user_input)
                         continue
 
-                    # Process user message
-                    self.session.add_user_message(user_input)
-                    console.print(
-                        "\n[dim][Processing user message...][/dim]"
-                    )
+                    # Process user message through agent
+                    if self.agent:
+                        result = await self.agent.execute(user_input)
+                        if result.success:
+                            self.stream_response(result.final_response or result.message)
+                        else:
+                            self.show_error(result.error or result.message)
+                    else:
+                        self.session.add_user_message(user_input)
+                        console.print("\n[dim][No agent connected][/dim]")
 
                 except KeyboardInterrupt:
                     console.print(

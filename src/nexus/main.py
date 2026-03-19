@@ -10,7 +10,13 @@ from rich.console import Console
 
 from nexus.cli.repl import create_repl
 from nexus.config.settings import settings
+from nexus.core.agent import Agent
 from nexus.core.types import ExecutionMode
+from nexus.mcp.client import MCPClientManager
+from nexus.mcp.servers.filesystem import filesystem_server
+from nexus.mcp.servers.search import search_server
+from nexus.persistence.store import SessionStore
+from nexus.tools.executor import MCPToolExecutor
 
 console = Console()
 app = typer.Typer(
@@ -69,9 +75,52 @@ def main(
         console.print("Available modes: auto, manual, confirmation")
         raise typer.Exit(1)
 
+    # Create LLM provider (Groq if key available, else Ollama)
+    if settings.GROQ_API_KEY:
+        from nexus.llm.groq_provider import GroqProvider
+        llm_provider = GroqProvider(
+            api_key=settings.GROQ_API_KEY,
+            model=settings.GROQ_MODEL,
+        )
+    else:
+        from nexus.llm.ollama_provider import OllamaProvider
+        llm_provider = OllamaProvider(
+            base_url=settings.OLLAMA_BASE_URL,
+            model=settings.OLLAMA_MODEL,
+        )
+        console.print("[yellow]No GROQ_API_KEY found — using Ollama (tool calling not supported).[/yellow]")
+
+    # Set up MCP tool layer
+    mcp_manager = MCPClientManager()
+    mcp_manager.register_server("filesystem", filesystem_server)
+    mcp_manager.register_server("search", search_server)
+    tool_executor = MCPToolExecutor(mcp_manager)
+
+    # Load or create session
+    store = SessionStore()
+    existing_session = None
+    if session_id and store.exists(session_id):
+        try:
+            existing_session = store.load(session_id)
+            console.print(f"[green]Resuming session {session_id[:8]}...[/green]")
+        except Exception as e:
+            console.print(f"[yellow]Could not load session: {e}. Starting fresh.[/yellow]")
+
     # Create and start REPL
     repl = create_repl()
-    repl.start_session(session_id=session_id, execution_mode=execution_mode)
+    session = repl.start_session(
+        session_id=session_id,
+        execution_mode=execution_mode,
+        existing_session=existing_session,
+    )
+
+    # Create agent and attach to REPL
+    agent = Agent(
+        llm_provider=llm_provider,
+        session=session,
+        tool_executor=tool_executor,
+    )
+    repl.set_agent(agent)
 
     # Run the main loop
     try:
@@ -84,6 +133,10 @@ def main(
             import traceback
             traceback.print_exc()
         raise typer.Exit(1)
+    finally:
+        if repl.session:
+            store.save(repl.session)
+            console.print(f"[dim]Session saved ({repl.session.session_id[:8]}). Resume with --session {repl.session.session_id}[/dim]")
 
 
 if __name__ == "__main__":

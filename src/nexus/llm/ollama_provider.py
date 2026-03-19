@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -64,7 +64,8 @@ class OllamaProvider(LLMProvider):
             if conversation_history:
                 messages.extend(conversation_history)
 
-            messages.append({"role": "user", "content": prompt})
+            if prompt:
+                messages.append({"role": "user", "content": prompt})
 
             # Note: Ollama doesn't support tool calling yet (as of 0.6.1)
             # Tools are ignored for local inference

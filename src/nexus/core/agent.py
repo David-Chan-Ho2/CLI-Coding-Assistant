@@ -74,6 +74,15 @@ class Agent:
                     # Tool calls detected
                     result.tool_calls_made += len(llm_response.tool_calls)
 
+                    # Save assistant message with tool calls before executing
+                    core_tool_calls = [
+                        ToolCall(id=tc.id, name=tc.name, arguments=tc.arguments)
+                        for tc in llm_response.tool_calls
+                    ]
+                    self.session.add_assistant_message(
+                        llm_response.content, core_tool_calls
+                    )
+
                     # Execute tools
                     tool_results = await self._execute_tool_calls(
                         llm_response.tool_calls
@@ -125,13 +134,39 @@ class Agent:
             Exception: If LLM invocation fails.
         """
         try:
-            # Get messages in context window
+            # Build context messages, preserving tool call/result structure
             context_messages = []
             for msg in self.session.get_context_messages():
-                context_messages.append({
-                    "role": msg.role.value,
-                    "content": msg.content,
-                })
+                if msg.role.value == "user":
+                    context_messages.append({"role": "user", "content": msg.content})
+                elif msg.role.value == "assistant":
+                    if msg.tool_calls:
+                        context_messages.append({
+                            "role": "assistant",
+                            "content": msg.content or "",
+                            "tool_calls": [
+                                {
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.name,
+                                        "arguments": json.dumps(tc.arguments),
+                                    },
+                                }
+                                for tc in msg.tool_calls
+                            ],
+                        })
+                        for tr in msg.tool_results:
+                            context_messages.append({
+                                "role": "tool",
+                                "tool_call_id": tr.tool_call_id,
+                                "content": tr.output,
+                            })
+                    else:
+                        context_messages.append({
+                            "role": "assistant",
+                            "content": msg.content,
+                        })
 
             # Build tool schemas if executor available
             tool_schemas = []
@@ -184,8 +219,10 @@ class Agent:
         for tool_call in tool_calls:
             try:
                 # Check if confirmation needed
+                risk = getattr(tool_call, "risk_level", RiskLevel.MEDIUM)
+                risk_value = risk.value if hasattr(risk, "value") else str(risk)
                 should_confirm = self.session.should_confirm_tool(
-                    tool_call.name, tool_call.risk_level.value
+                    tool_call.name, risk_value
                 )
 
                 if should_confirm:

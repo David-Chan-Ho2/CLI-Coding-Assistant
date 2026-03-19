@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from .types import ExecutionMode, Message, MessageRole, SessionMetadata, ToolCall, ToolResult
+from .types import ExecutionMode, Message, MessageRole, RiskLevel, SessionMetadata, ToolCall, ToolResult
 
 
 class SessionContext:
@@ -204,6 +204,48 @@ Always prioritize:
             ],
             "iteration_count": self.iteration_count,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SessionContext":
+        """Reconstruct a SessionContext from a serialized dictionary."""
+        session = cls(session_id=data["session_id"])
+
+        meta = data.get("metadata", {})
+        session.metadata.created_at = datetime.fromisoformat(meta["created_at"])
+        session.metadata.updated_at = datetime.fromisoformat(meta["updated_at"])
+        session.metadata.execution_mode = ExecutionMode(meta["execution_mode"])
+        session.metadata.llm_model = meta.get("llm_model", "groq")
+        session.metadata.total_tokens = meta.get("total_tokens", 0)
+        session.metadata.tool_calls_count = meta.get("tool_calls_count", 0)
+        session.metadata.status = meta.get("status", "active")
+
+        for msg_data in data.get("messages", []):
+            msg = Message(
+                id=msg_data["id"],
+                role=MessageRole(msg_data["role"]),
+                content=msg_data["content"],
+                timestamp=datetime.fromisoformat(msg_data["timestamp"]),
+            )
+            for tc in msg_data.get("tool_calls", []):
+                msg.tool_calls.append(ToolCall(
+                    id=tc["id"],
+                    name=tc["name"],
+                    arguments=tc["arguments"],
+                    risk_level=RiskLevel(tc.get("risk_level", "medium")),
+                ))
+            for tr in msg_data.get("tool_results", []):
+                msg.tool_results.append(ToolResult(
+                    tool_call_id=tr["tool_call_id"],
+                    tool_name=tr["tool_name"],
+                    output=tr["output"],
+                    success=tr["success"],
+                    error=tr.get("error"),
+                    execution_time_ms=tr.get("execution_time_ms", 0.0),
+                ))
+            session.messages.append(msg)
+
+        session.iteration_count = data.get("iteration_count", 0)
+        return session
 
     def _update_metadata(self) -> None:
         """Update metadata timestamp."""
