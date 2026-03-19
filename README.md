@@ -185,17 +185,17 @@ cp .env.example .env
 
 ### Phase 1: Foundation ✅ In Progress
 
-- [ ] CLI REPL interface
-- [ ] Session management
-- [ ] Core types & data structures
-- [ ] Project structure & dependencies
+- [x] CLI REPL interface
+- [x] Session management
+- [x] Core types & data structures
+- [x] Project structure & dependencies
 
 ### Phase 2: Core Loop ⏳ Next
 
-- [ ] Agentic loop orchestrator
-- [ ] LLM provider abstraction
-- [ ] Error handling & retry logic
-- [ ] Integration tests
+- [x] Agentic loop orchestrator
+- [x] LLM provider abstraction
+- [x] Error handling & retry logic
+- [x] Integration tests
 
 ### Phase 3: Tools & MCP ⏳ Future
 
